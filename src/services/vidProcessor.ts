@@ -51,15 +51,19 @@ export async function extractYtDlp(url: string): Promise<ExtractedInfo> {
       try {
         const info = JSON.parse(out);
 
-        const formats: MediaFormat[] = info.formats.map((f: any) => ({
-          id: f.format_id,
-          quality: f.height ? `${f.height}p` : f.format_note,
-          ext: f.ext,
-          url: f.url,
-          hasAudio: f.acodec !== "none",
-          hasVideo: f.vcodec !== "none",
-          size: f.filesize || f.filesize_approx,
-        }));
+        const formats: MediaFormat[] = info.formats
+          .filter((f: any) => f.height && f.height >= 144)
+          .filter((f: any) => f.vcodec !== "none" && f.acodec !== "none")
+          // .filter((f: any) => f.format_id.endsWith("-1"))
+          .map((f: any) => ({
+            id: f.format_id,
+            quality: f.height ? `${f.height}p` : f.format_note,
+            ext: f.ext,
+            url: f.url,
+            hasAudio: f.acodec !== "none",
+            hasVideo: f.vcodec !== "none",
+            size: f.filesize || f.filesize_approx,
+          }));
 
         resolve({
           id: info.id,

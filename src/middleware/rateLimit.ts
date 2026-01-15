@@ -1,10 +1,11 @@
 import { Request,Response, NextFunction } from "express";
-import {redis} from "../lib/redis";
+import {getRedis} from "../lib/redis";
 
 const WINDOW = 60; // time window in seconds
 const MAX_REQUESTS = 5; // max requests per window
 
 export const rateLimit =   async (req: Request, res: Response, next: NextFunction) => { 
+const redis = getRedis();
 
 const ip = req.ip;
 const key = `rate-limit:${ip}`;

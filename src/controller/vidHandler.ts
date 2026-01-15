@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 import { pipeline } from 'node:stream';
 import { promisify } from 'util';
 import { extractYtDlp } from '../services/vidProcessor';
+import getVideoUrl from '../services/puppeteer';
 
 
 
@@ -23,14 +24,23 @@ export const vidHandler = async (req: Request, res: Response) => {
   }
  
   const { url } = req.body;
+  console.log('Fetching YouTube video info for URL:', url);
   
-  
-    try {
-    extractYtDlp(url).then(info => {
-      res.json({ info });
-    }).catch(err => {
-      res.status(500).json({ error: 'Failed to fetch video info', details: err.message });
-    });
+    // try {
+    // extractYtDlp(url).then(info => {
+    //   res.json({ info });
+    // }).catch(err => {
+    //   res.status(500).json({ error: 'Failed to fetch video info', details: err.message });
+    // });
+   try {
+    const videoUrl = await getVideoUrl(url);
+    if (videoUrl) {
+      console.log('Video URL:', videoUrl);
+      res.json({ videoUrl });
+    } else {
+      res.status(404).json({ error: 'Video URL not found on the page' });
+   }
+
   
   } catch (error) {
     console.error('Error fetching YouTube video info:', error);

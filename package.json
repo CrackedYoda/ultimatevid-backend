@@ -21,6 +21,7 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.9.1",
     "node-fetch": "^3.3.2",
+    "puppeteer": "^24.35.0",
     "redis": "^5.10.0",
     "yt-dlp-wrap": "^2.3.12"
   },
