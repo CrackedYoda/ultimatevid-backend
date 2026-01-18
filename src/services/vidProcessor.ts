@@ -47,7 +47,6 @@ export async function extractYtDlp(url: string): Promise<ExtractedInfo> {
       if (code !== 0) {
         return reject(new Error(err || "yt-dlp process failed"));
       }
-
       try {
         const info = JSON.parse(out);
 

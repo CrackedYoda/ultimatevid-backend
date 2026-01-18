@@ -11,7 +11,7 @@ interface DownloadOptions {
 
 export async function downloadYoutubeVideo(
   options: DownloadOptions
-): Promise<string> {
+): Promise<any> {
   const { url, outputPath = './downloads', quality = 'highest' } = options;
 
   try {
@@ -70,6 +70,8 @@ export async function getVideoInfo(url: string) {
     const info = await ytdl.getInfo(url);
     const details = info.videoDetails;
 
+    
+
     return {
       videoId: details.videoId,
       title: details.title,
@@ -96,7 +98,6 @@ export async function getAvailableQualities(url: string) {
     const formats = info.formats;
 
     const qualities = formats
-      .filter((format) => format.hasVideo && format.hasAudio)
       .map((format) => ({
         qualityLabel: format.qualityLabel || 'Unknown',
         quality: format.quality as string,

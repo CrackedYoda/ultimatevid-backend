@@ -25,7 +25,7 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
 app.post("/video", vidHandler);
 
-app.get("/download", rateLimit,downloadVid); 
+app.get("/download", downloadVid); 
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
