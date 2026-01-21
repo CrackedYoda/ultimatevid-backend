@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 
-import { vidHandler, downloadVid } from './controller/vidHandler';
+import videoController from './controller/vidHandler';
 import { rateLimit } from './middleware/rateLimit';
 
 const app = express();
@@ -23,9 +23,11 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.post("/video", vidHandler);
 
-app.get("/download", downloadVid); 
+app.post("/check", rateLimit,videoController.vidCheck);  
+app.get("/download", rateLimit,videoController.vidHandler);
+
+// app.get("/download", downloadVideo); 
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
