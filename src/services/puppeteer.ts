@@ -16,84 +16,88 @@ puppeteer.use(StealthPlugin());
 
 class videoDownloader {
 
-async  getVideoUrl(pageUrl: string): Promise<string | null> {
-  const browser = await puppeteer.launch({
-    headless: false, // keep false for reliability
-    args: [
-      "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu",
-    "--no-first-run",
-    "--no-zygote",
-    "--disable-background-networking",
-    "--disable-default-apps",
-    "--disable-extensions",
-    "--disable-sync"
+  async getVideoUrl(pageUrl: string): Promise<string | null> {
+    const isProduction = process.env.NODE_ENV === 'production';
 
-    ],
-  });
-  
-  const urlType = detectPlatform(pageUrl);
-  try {
-  const page = await browser.newPage();
-  if (urlType == "facebook") {
-    await page.setUserAgent(
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) " +
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 " +
-        "Mobile/15E148 Safari/604.1"
-    );
-  } 
-   else { await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-        "AppleWebKit/537.36 (KHTML, like Gecko) " +
-        "Chrome/85.0.4183.102 Safari/537.36"
-    ); }
-  
+    const browser = await puppeteer.launch({
+      headless: isProduction ? true : false, // Use headless in production (Docker)
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, // Use system chromium in Docker
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-zygote",
+        "--disable-background-networking",
+        "--disable-default-apps",
+        "--disable-extensions",
+        "--disable-sync"
+      ],
+    });
 
-  await page.setDefaultNavigationTimeout(60_000);
-
-  let videoUrl: string | null = null;
-
-  page.on("response", async (response) => {
-    const url = response.url();
-
-    // Ignore blob URLs
-    if (url.startsWith("blob:")) return;
-
-    if (url.includes(".m3u8") || url.includes(".mp4")) {
-      if (!videoUrl) {
-        videoUrl = url;
-        console.log("Found video URL:", videoUrl);
+    const urlType = detectPlatform(pageUrl);
+    try {
+      const page = await browser.newPage();
+      if (urlType == "facebook") {
+        await page.setUserAgent(
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) " +
+          "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 " +
+          "Mobile/15E148 Safari/604.1"
+        );
       }
+      else {
+        await page.setUserAgent(
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+          "AppleWebKit/537.36 (KHTML, like Gecko) " +
+          "Chrome/85.0.4183.102 Safari/537.36"
+        );
+      }
+
+
+      await page.setDefaultNavigationTimeout(60_000);
+
+      let videoUrl: string | null = null;
+
+      page.on("response", async (response) => {
+        const url = response.url();
+
+        // Ignore blob URLs
+        if (url.startsWith("blob:")) return;
+
+        if (url.includes(".m3u8") || url.includes(".mp4")) {
+          if (!videoUrl) {
+            videoUrl = url;
+            console.log("Found video URL:", videoUrl);
+          }
+        }
+      });
+
+      await page.goto(pageUrl, { waitUntil: "domcontentloaded", timeout: 0 });
+
+      // await page.evaluate(() => {
+      //   // Scroll to the bottom of the page to trigger lazy loading
+      //   window.scrollTo(0, document.body.scrollHeight);
+      // });
+
+      // Let video load and trigger requests
+      await new Promise((resolve) => setTimeout(resolve, 7000));
+
+      if (!videoUrl) {
+        throw new Error("No video URL found");
+      }
+
+      return videoUrl;
+    } catch (error) {
+      console.error("Error detecting platform:", error);
     }
-  });
-
-  await page.goto(pageUrl, { waitUntil: "domcontentloaded", timeout: 0 });
-
-  // await page.evaluate(() => {
-  //   // Scroll to the bottom of the page to trigger lazy loading
-  //   window.scrollTo(0, document.body.scrollHeight);
-  // });
-
-  // Let video load and trigger requests
-  await new Promise((resolve) => setTimeout(resolve, 7000));
-
-  if (!videoUrl) {
-    throw new Error("No video URL found");
+    finally {
+      await browser.close();
+    }
+    return null;
   }
 
-  return videoUrl;
-  }catch (error) {
-    console.error("Error detecting platform:", error);
-  }
-  finally {
-    await browser.close();
-  }
-  return null;
-}
-
-async downloadVideoUrl(pageUrl: string, res: Response) {
+  async downloadVideoUrl(pageUrl: string, res: Response) {
     const mediaUrl = pageUrl;
 
     if (!mediaUrl || typeof mediaUrl !== "string") {

@@ -5,7 +5,7 @@ const WINDOW = 60; // time window in seconds
 const MAX_REQUESTS = 5; // max requests per window
 
 export const rateLimit =   async (req: Request, res: Response, next: NextFunction) => { 
-const redis = getRedis();
+const redis = await getRedis();
 
 const ip = req.ip;
 const key = `rate-limit:${ip}`;
