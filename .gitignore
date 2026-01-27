@@ -4,3 +4,8 @@ config.env
 development
 config/development.json
 config/development.json
+.dockerignore
+.gitignore
+dist
+compose.yaml
+Dockerfile
