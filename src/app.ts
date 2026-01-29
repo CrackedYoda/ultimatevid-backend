@@ -1,9 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-
+import mediaRoute from './routes/mediaroute';
 import videoController from './controller/vidHandler';
 import { rateLimit } from './middleware/rateLimit';
+
+
+import "./services/worker"
+
 
 const app = express();
 
@@ -26,8 +30,8 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
 app.post("/check", rateLimit,videoController.vidCheck);  
 app.get("/download", rateLimit,videoController.vidHandler);
+app.use("/media", mediaRoute)
 
-// app.get("/download", downloadVideo); 
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -9,3 +9,5 @@ config/development.json
 dist
 compose.yaml
 Dockerfile
+videos
+.env.development

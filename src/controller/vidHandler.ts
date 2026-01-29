@@ -1,8 +1,9 @@
 import { Request, Response } from "express";
 import { detectPlatform } from "../helper/checkVid";;
-import videoService from "../services/vidService";
+import { getTitle } from "../services/vidService";
 import videoDownloader from "../services/puppeteer";
 import { getErrorHtml } from "../helper/errorResponse";
+import { downloadQueue } from "../queue/downloadqeue";
 
 const socials = [""];
 //  will use  ytdlp directly instead of puppeteer for socials, less resource intensive
@@ -24,7 +25,7 @@ class videoController {
 
     url = req.body.url;
 
-    const title = await videoService.getTitle(url);
+    const title = await getTitle(url);
 
     return res.status(200).json({ success: true, title: title || "video", url: url });
 
@@ -38,6 +39,10 @@ class videoController {
     // Handle file upload logic here
 
     // post req starts here
+
+    url = req.query.url as string;
+
+
 
 
     if (socials.includes(detectPlatform(url))) {
@@ -58,7 +63,8 @@ class videoController {
 
     else {
       try {
-        await videoService.downloadVideo(url, res);
+        const job = await downloadQueue.add("download", { url });
+        console.log(`Job ${job.id} added to the download queue`);
       } catch (error) {
         console.error("Error fetching video info:", error);
         res.status(500).send(getErrorHtml("Something went wrong, Please try again"));
