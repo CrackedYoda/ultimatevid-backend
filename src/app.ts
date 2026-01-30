@@ -7,6 +7,9 @@ import { rateLimit } from './middleware/rateLimit';
 
 
 import "./services/worker"
+import { startCleanupTask } from './services/cleanup';
+
+startCleanupTask();
 
 
 const app = express();
@@ -28,8 +31,8 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 });
 
 
-app.post("/check", rateLimit,videoController.vidCheck);  
-app.get("/download", rateLimit,videoController.vidHandler);
+app.post("/check", rateLimit, videoController.vidCheck);
+app.get("/download", rateLimit, videoController.vidHandler);
 app.use("/media", mediaRoute)
 
 

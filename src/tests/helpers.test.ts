@@ -28,6 +28,10 @@ describe("Helper Functions", () => {
             expect(detectPlatform("https://x.com/user/status/123")).toBe("twitter");
         });
 
+        test("should detect reddit URLs", () => {
+            expect(detectPlatform("https://www.reddit.com/r/funny/comments/123/video/")).toBe("reddit");
+        });
+
         test("should return 'other' for unknown platforms", () => {
             expect(detectPlatform("https://example.com")).toBe("other");
         });
