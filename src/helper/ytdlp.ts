@@ -7,7 +7,7 @@ export function spawnYtdlp(pageUrl: string) {
     YTDLP_PATH,
     [
       "-f",
-      "bv*+ba/b[ext=mp4]",
+      "bv*[vcodec^=avc1]+ba[acodec^=mp4a]/b[ext=mp4]/b",
       "--merge-output-format",
       "mp4",
       "--downloader",
