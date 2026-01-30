@@ -6,6 +6,14 @@ let redis: RedisClientType | null = null;
 export async function getRedis(): Promise<RedisClientType> {
   if (redis) return redis;
 
+
+  if(process.env.REDIS_URL){
+    redis = createClient({
+      url: process.env.REDIS_URL,
+    });
+
+  }
+  else{
   redis = createClient({
     socket: {
       host: process.env.REDIS_HOST,
@@ -13,7 +21,7 @@ export async function getRedis(): Promise<RedisClientType> {
     },
     password: process.env.REDIS_PASSWORD || undefined,
   });
-
+}
   // IMPORTANT: handle connection errors
   redis.on("error", (err) => {
     console.error("Redis Client Error:", err);
