@@ -4,7 +4,11 @@ import helmet from 'helmet';
 import mediaRoute from './routes/mediaroute';
 import videoController from './controller/vidHandler';
 import { rateLimit } from './middleware/rateLimit';
+import dotenv from 'dotenv';
 
+
+
+dotenv.config();
 
 import "./services/worker"
 import { startCleanupTask } from './services/cleanup';
