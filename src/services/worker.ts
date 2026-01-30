@@ -6,7 +6,7 @@ import { bullRedis } from "../lib/bullredis";
 import { detectPlatform } from "../helper/checkVid";
 import { spawnYtdlp } from "../helper/ytdlp";
 import { spawnYtdlp2 } from "../helper/ytdlp2";
-import {getTitle} from "../services/vidService"
+import { getTitle } from "../services/vidService"
 
 const OUTPUT_DIR = path.join(process.cwd(), "videos");
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -14,11 +14,8 @@ fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 function sanitizeFilename(input: string): string {
   return input
     .normalize("NFKD")
-    .replace(/[\uFFFD]/g, "")
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
-    .replace(/[^\x20-\x7E]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
+    .replace(/[\u0300-\u036f]/g, "") // Remove accents
+    .replace(/[^a-zA-Z0-9]/g, "") // Remove everything except alphanumeric
     .slice(0, 120);
 }
 
@@ -34,7 +31,7 @@ new Worker(
   "downloadQueue",
   async job => {
 
-    console.log(`[JOB ${job.id}] starting and ${job.data}`);
+    console.log(`[JOB ${job.id}] starting and ${JSON.stringify(job.data)}`);
 
     const { url } = job.data;
     if (!url || typeof url !== "string") {
@@ -83,44 +80,43 @@ new Worker(
       };
     } catch {
       console.warn(`[JOB ${job.id}] remux failed, re-encoding`);
+
+      const ffmpegEncode = spawn("ffmpeg", [
+        "-y",
+        "-i", "pipe:0",
+
+        "-c:v", "libx264",
+        "-profile:v", "baseline",
+        "-level", "3.0",
+        "-pix_fmt", "yuv420p",
+
+        "-c:a", "aac",
+        "-b:a", "128k",
+
+        "-movflags", "+faststart",
+        outputPath,
+      ]);
+
+      ytdlp.stdout.pipe(ffmpegEncode.stdin);
+
+      ytdlp.stderr.on("data", d =>
+        console.error(`[yt-dlp ${job.id}]`, d.toString())
+      );
+      ffmpegEncode.stderr.on("data", d =>
+        console.error(`[ffmpeg-encode ${job.id}]`, d.toString())
+      );
+
+      await wait(ffmpegEncode);
+
+      console.log(`[JOB ${job.id}] encoded`);
+
+      return {
+        fileName: path.basename(outputPath),
+        mode: "encode",
+      };
     }
 
-    // ─────────────────────────────────────
-    // 2️⃣ FALLBACK: RE-ENCODE (SAFE PATH)
-    // ─────────────────────────────────────
-    const ffmpegEncode = spawn("ffmpeg", [
-      "-y",
-      "-i", "pipe:0",
 
-      "-c:v", "libx264",
-      "-profile:v", "baseline",
-      "-level", "3.0",
-      "-pix_fmt", "yuv420p",
-
-      "-c:a", "aac",
-      "-b:a", "128k",
-
-      "-movflags", "+faststart",
-      outputPath,
-    ]);
-
-    ytdlp.stdout.pipe(ffmpegEncode.stdin);
-
-    ytdlp.stderr.on("data", d =>
-      console.error(`[yt-dlp ${job.id}]`, d.toString())
-    );
-    ffmpegEncode.stderr.on("data", d =>
-      console.error(`[ffmpeg-encode ${job.id}]`, d.toString())
-    );
-
-    await wait(ffmpegEncode);
-
-    console.log(`[JOB ${job.id}] encoded`);
-
-    return {
-      fileName: path.basename(outputPath),
-      mode: "encode",
-    };
   },
   {
     connection: bullRedis,

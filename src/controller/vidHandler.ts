@@ -4,6 +4,10 @@ import { getTitle } from "../services/vidService";
 import videoDownloader from "../services/puppeteer";
 import { getErrorHtml } from "../helper/errorResponse";
 import { downloadQueue } from "../queue/downloadqeue";
+import { QueueEvents } from "bullmq";
+import { bullRedis } from "../lib/bullredis";
+
+const queueEvents = new QueueEvents("downloadQueue", { connection: bullRedis });
 
 const socials = [""];
 //  will use  ytdlp directly instead of puppeteer for socials, less resource intensive
@@ -65,6 +69,10 @@ class videoController {
       try {
         const job = await downloadQueue.add("download", { url });
         console.log(`Job ${job.id} added to the download queue`);
+
+        const result = await job.waitUntilFinished(queueEvents);
+        res.status(200).json({ success: true, ...result });
+
       } catch (error) {
         console.error("Error fetching video info:", error);
         res.status(500).send(getErrorHtml("Something went wrong, Please try again"));

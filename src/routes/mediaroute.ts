@@ -9,7 +9,8 @@ const base = path.join(process.cwd(), "videos");
 
 
 router.get("/:file", (req: Request, res: Response) => {
-const file: any = req.params.file;
+const file: string =  req.params.file as string;
+console.log(file);  
 const filePath = path.join(base, file);
 
 if (!fs.existsSync(filePath)){
@@ -19,6 +20,8 @@ if (!fs.existsSync(filePath)){
 
 res.setHeader("Content-Type", "video/mp4");
 res.setHeader("Accept-Ranges", "bytes");
+res.setHeader("Content-Disposition", `attachment; filename="${file}"`);
+
 res.sendFile(filePath)
 
 })
