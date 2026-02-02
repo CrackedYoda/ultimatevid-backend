@@ -15,7 +15,7 @@ function sanitizeFilename(input: string): string {
   return input
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "") // Remove accents
-    .replace(/[^a-zA-Z0-9]/g, "") // Remove everything except alphanumeric
+    .replace(/[^a-zA-Z0-9 ]/g, "") // Remove everything except alphanumeric and spaces
     .slice(0, 120);
 }
 
@@ -38,82 +38,111 @@ new Worker(
       throw new Error("Invalid URL");
     }
 
-    const videoName = await getTitle(url);
+    const videoName = (await getTitle(url)) || "video";
     const safeName = sanitizeFilename(`${videoName}`);
     const outputPath = path.join(OUTPUT_DIR, `${safeName}.mp4`);
     const tempPath = `${outputPath}.tmp`;
 
     console.log(`[JOB ${job.id}] processing`);
 
-    const ytdlp =
-      detectPlatform(url) === "tiktok" // cause tiktok videos are weird and behave different with ytdlp tch
-        ? spawnYtdlp(url)
-        : spawnYtdlp2(url);
+    // --- RETRY LOGIC (Cookies) ---
+    async function processDownload(useCookies: boolean) {
+      console.log(`[JOB ${job.id}] attempting download with cookies=${useCookies}`);
+
+      const ytdlp =
+        detectPlatform(url) === "tiktok"
+          ? spawnYtdlp(url, useCookies)
+          : spawnYtdlp2(url, useCookies);
+
+      try {
+        const ffmpegRemux = spawn("ffmpeg", [
+          "-y",
+          "-i", "pipe:0",
+          "-c", "copy",
+          "-movflags", "+faststart",
+          "-f", "mp4",
+          tempPath,
+        ]);
+
+        // @ts-ignore
+        ytdlp.stdout.pipe(ffmpegRemux.stdin);
+
+        // @ts-ignore
+        ytdlp.stderr.on("data", (d: any) =>
+          console.error(`[yt-dlp ${job.id}]`, d.toString())
+        );
+        // @ts-ignore
+        ffmpegRemux.stderr.on("data", (d: any) =>
+          console.error(`[ffmpeg-remux ${job.id}]`, d.toString())
+        );
+
+        // Wait for BOTH processes to ensure catch block triggers on yt-dlp failure too
+        await Promise.all([wait(ytdlp), wait(ffmpegRemux)]);
+
+        fs.renameSync(tempPath, outputPath);
+        console.log(`[JOB ${job.id}] remuxed (cookies=${useCookies})`);
+
+        return {
+          fileName: path.basename(outputPath),
+          mode: "remux",
+        };
+      } catch (err) {
+        console.warn(`[JOB ${job.id}] remux failed (cookies=${useCookies})`);
+
+        // If this was the second attempt (auth failure) or some unrecoverable codec error, we might try re-encoding
+        // BUT current logic suggests we should retry with cookies IF specific yt-dlp failure.
+        // For simplicity, we just throw here to let the outer loop handle retry or final failure.
+        throw err;
+      }
+    }
 
     try {
-      const ffmpegRemux = spawn("ffmpeg", [   // we try remux first (fastest)
-        "-y",
-        "-i", "pipe:0",
-        "-c", "copy",
-        "-movflags", "+faststart",
-        "-f", "mp4",
-        tempPath,
-      ]);
+      // First attempt: NO cookies
+      return await processDownload(false);
+    } catch (e) {
+      console.warn(`[JOB ${job.id}] First attempt failed, retrying with cookies...`);
+      try {
+        // Second attempt: WITH cookies
+        return await processDownload(true);
+      } catch (finalErr) {
+        // Fallback to Re-encoding (last resort) if it's a codec issue, 
+        // OR just fail if it's a download issue.
+        // Keeping original re-encode logic as a final "Hail Mary" would be complex to nest.
+        // Let's assume if both fail, we might want to try the re-encode path 
+        // OR just fail. Given the prompts, the main issue is AUTH.
+        // I'll add a simplified re-encode fallback here for the FINAL attempt.
 
-      ytdlp.stdout.pipe(ffmpegRemux.stdin);
+        console.warn(`[JOB ${job.id}] Second attempt failed, trying re-encode fallback with cookies`);
 
-      ytdlp.stderr.on("data", d =>
-        console.error(`[yt-dlp ${job.id}]`, d.toString())
-      );
-      ffmpegRemux.stderr.on("data", d =>
-        console.error(`[ffmpeg-remux ${job.id}]`, d.toString())
-      );
+        // ... (Original re-encode logic but using cookies=true)
+        const ytdlp =
+          detectPlatform(url) === "tiktok"
+            ? spawnYtdlp(url, true)
+            : spawnYtdlp2(url, true);
 
-      await wait(ffmpegRemux);
+        const ffmpegEncode = spawn("ffmpeg", [
+          "-y",
+          "-i", "pipe:0",
+          "-c:v", "libx264",
+          "-profile:v", "baseline",
+          "-level", "3.0",
+          "-pix_fmt", "yuv420p",
+          "-c:a", "aac",
+          "-b:a", "128k",
+          "-movflags", "+faststart",
+          outputPath,
+        ]);
 
-      fs.renameSync(tempPath, outputPath);
-      console.log(`[JOB ${job.id}] remuxed`);
+        // @ts-ignore
+        ytdlp.stdout.pipe(ffmpegEncode.stdin);
 
-      return {
-        fileName: path.basename(outputPath),
-        mode: "remux",
-      };
-    } catch {
-      console.warn(`[JOB ${job.id}] remux failed, re-encoding`);
+        await Promise.all([wait(ytdlp), wait(ffmpegEncode)]);
 
-      const ffmpegEncode = spawn("ffmpeg", [
-        "-y",
-        "-i", "pipe:0",
-
-        "-c:v", "libx264",
-        "-profile:v", "baseline",
-        "-level", "3.0",
-        "-pix_fmt", "yuv420p",
-
-        "-c:a", "aac",
-        "-b:a", "128k",
-
-        "-movflags", "+faststart",
-        outputPath,
-      ]);
-
-      ytdlp.stdout.pipe(ffmpegEncode.stdin);
-
-      ytdlp.stderr.on("data", d =>
-        console.error(`[yt-dlp ${job.id}]`, d.toString())
-      );
-      ffmpegEncode.stderr.on("data", d =>
-        console.error(`[ffmpeg-encode ${job.id}]`, d.toString())
-      );
-
-      await wait(ffmpegEncode);
-
-      console.log(`[JOB ${job.id}] encoded`);
-
-      return {
-        fileName: path.basename(outputPath),
-        mode: "encode",
-      };
+        return {
+          fileName: path.basename(outputPath),
+          mode: "encode",
+        };
+      }
     }
 
 

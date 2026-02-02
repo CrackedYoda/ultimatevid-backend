@@ -11,3 +11,4 @@ compose.yaml
 Dockerfile
 videos
 .env.development
+cookies.txt

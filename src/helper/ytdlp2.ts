@@ -1,37 +1,38 @@
 import { spawn } from "child_process";
 
-
 const YTDLP_PATH = process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
 
-export function spawnYtdlp2(pageUrl: string) {
+export function spawnYtdlp2(pageUrl: string, useCookies: boolean = false) {
+  const args = [
+    "--no-playlist",
 
-  return spawn(
-    YTDLP_PATH,
-    [
-      "--no-playlist",
+    "-S",
+    "vcodec:h264,res,acodec:aac",
 
-      "-f",
-      "bv*[vcodec^=avc1]+ba[acodec^=mp4a]/b[ext=mp4]/b",
+    "--merge-output-format",
+    "mp4",
 
-      "--merge-output-format",
-      "mp4",
+    "--remux-video",
+    "mp4",
 
-      "--remux-video",
-      "mp4",
+    "--downloader",
+    "ffmpeg",
 
-      "--downloader",
-      "ffmpeg",
+    "--downloader-args",
+    "ffmpeg:-movflags frag_keyframe+empty_moov",
+    "--js-runtimes",
+    "node",
+    "--remote-components",
+    "ejs:github",
+  ];
 
-      "--downloader-args",
-      "ffmpeg:-movflags frag_keyframe+empty_moov",
+  if (useCookies) {
+    args.push("--cookies", "/app/cookies/cookies.txt");
+  }
 
-      "-o",
-      "-", // 👈 WRITE TO STDOUT (NO FILE PATH)
-      pageUrl,
-    ],
-    {
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
+  args.push("-o", "-", pageUrl);
 
+  return spawn(YTDLP_PATH, args, {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 }
